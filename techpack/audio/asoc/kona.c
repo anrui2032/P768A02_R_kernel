@@ -72,6 +72,7 @@
 #define ADSP_STATE_READY_TIMEOUT_MS 3000
 #define DEV_NAME_STR_LEN            32
 #define WCD_MBHC_HS_V_MAX           1600
+#define WCD_MBHC_HS_V_MAX_ZTE       1700
 
 #define TDM_CHANNEL_MAX		8
 #define DEV_NAME_STR_LEN	32
@@ -88,6 +89,8 @@
 #define WCN_CDC_SLIM_TX_CH_MAX 2
 #define WCN_CDC_SLIM_TX_CH_MAX_LITO 3
 
+/* ZTE_chenjun */
+#define ZTE_MBHC_CAL
 #define SWR_MAX_SLAVE_DEVICES 6
 
 enum {
@@ -919,6 +922,16 @@ static struct wcd_mbhc_config wcd_mbhc_cfg = {
 	.mono_stero_detection = false,
 	.swap_gnd_mic = NULL,
 	.hs_ext_micbias = true,
+#ifdef ZTE_MBHC_CAL
+	.key_code[0] = KEY_MEDIA,
+	.key_code[1] = KEY_VOLUMEUP,
+	.key_code[2] = KEY_VOLUMEDOWN,
+	.key_code[3] = 0,
+	.key_code[4] = 0,
+	.key_code[5] = 0,
+	.key_code[6] = 0,
+	.key_code[7] = 0,
+#else
 	.key_code[0] = KEY_MEDIA,
 	.key_code[1] = KEY_VOICECOMMAND,
 	.key_code[2] = KEY_VOLUMEUP,
@@ -927,6 +940,7 @@ static struct wcd_mbhc_config wcd_mbhc_cfg = {
 	.key_code[5] = 0,
 	.key_code[6] = 0,
 	.key_code[7] = 0,
+#endif
 	.linein_th = 5000,
 	.moisture_en = false,
 	.mbhc_micbias = MIC_BIAS_2,
@@ -4565,6 +4579,9 @@ static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool acti
 	struct msm_asoc_mach_data *pdata =
 				snd_soc_card_get_drvdata(card);
 
+/* ZTE_chenjun */
+	pr_info("%s: active %d\n", __func__, active);
+
 	if (!pdata->fsa_handle)
 		return false;
 
@@ -5744,12 +5761,27 @@ static void *def_wcd_mbhc_cal(void)
 	if (!wcd_mbhc_cal)
 		return NULL;
 
+#ifdef ZTE_MBHC_CAL
+	WCD_MBHC_CAL_PLUG_TYPE_PTR(wcd_mbhc_cal)->v_hs_max = WCD_MBHC_HS_V_MAX_ZTE;
+#else
 	WCD_MBHC_CAL_PLUG_TYPE_PTR(wcd_mbhc_cal)->v_hs_max = WCD_MBHC_HS_V_MAX;
+#endif
+
 	WCD_MBHC_CAL_BTN_DET_PTR(wcd_mbhc_cal)->num_btn = WCD_MBHC_DEF_BUTTONS;
 	btn_cfg = WCD_MBHC_CAL_BTN_DET_PTR(wcd_mbhc_cal);
 	btn_high = ((void *)&btn_cfg->_v_btn_low) +
 		(sizeof(btn_cfg->_v_btn_low[0]) * btn_cfg->num_btn);
 
+#ifdef ZTE_MBHC_CAL
+	btn_high[0] = 100;
+	btn_high[1] = 200;
+	btn_high[2] = 750;
+	btn_high[3] = 750;
+	btn_high[4] = 750;
+	btn_high[5] = 750;
+	btn_high[6] = 750;
+	btn_high[7] = 750;
+#else
 	btn_high[0] = 75;
 	btn_high[1] = 150;
 	btn_high[2] = 237;
@@ -5758,9 +5790,23 @@ static void *def_wcd_mbhc_cal(void)
 	btn_high[5] = 500;
 	btn_high[6] = 500;
 	btn_high[7] = 500;
+#endif
 
 	return wcd_mbhc_cal;
 }
+
+#ifdef CONFIG_NXP_TFA9894_SMARTPA_STEREO
+static struct snd_soc_dai_link_component tfa98xx_dai_link_component[] = {
+	{
+		.name = "tfa98xx.8-0034",
+		.dai_name = "tfa98xx-aif-8-34",
+	},
+	{
+		.name = "tfa98xx.8-0035",
+		.dai_name = "tfa98xx-aif-8-35",
+	}
+};
+#endif
 
 /* Digital audio interface glue - connects codec <---> CPU */
 static struct snd_soc_dai_link msm_common_dai_links[] = {
@@ -6407,6 +6453,36 @@ static struct snd_soc_dai_link msm_common_misc_fe_dai_links[] = {
 		.no_host_mode = SND_SOC_DAI_LINK_NO_HOST,
 		.ops = &msm_cdc_dma_be_ops,
 	},
+	{/* hw:x,40 */
+		.name = "SEC_MI2S Hostless",
+		.stream_name = "SEC_MI2S Hostless",
+		.cpu_dai_name = "SEC_MI2S_RX_HOSTLESS",
+		.platform_name = "msm-pcm-hostless",
+		.dynamic = 1,
+		.dpcm_playback = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			    SND_SOC_DPCM_TRIGGER_POST},
+		.no_host_mode = SND_SOC_DAI_LINK_NO_HOST,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+	},
+	{/* hw:x,41 */
+		.name = "PRI_MI2S Hostless",
+		.stream_name = "PRI_MI2S Hostless",
+		.cpu_dai_name = "PRI_MI2S_RX_HOSTLESS",
+		.platform_name = "msm-pcm-hostless",
+		.dynamic = 1,
+		.dpcm_playback = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			    SND_SOC_DPCM_TRIGGER_POST},
+		.no_host_mode = SND_SOC_DAI_LINK_NO_HOST,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+	},
 };
 
 static struct snd_soc_dai_link msm_common_be_dai_links[] = {
@@ -6861,8 +6937,13 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.stream_name = "Primary MI2S Playback",
 		.cpu_dai_name = "msm-dai-q6-mi2s.0",
 		.platform_name = "msm-pcm-routing",
+#if defined(CONFIG_SND_SMARTPA_AW881XX) && (!defined(CONFIG_SND_SEC_I2S_AW881XX))
+		.codec_name = "aw881xx_smartpa.7-0034",
+		.codec_dai_name = "aw881xx-aif-7-34",
+#else
 		.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-rx",
+#endif
 		.no_pcm = 1,
 		.dpcm_playback = 1,
 		.id = MSM_BACKEND_DAI_PRI_MI2S_RX,
@@ -6890,8 +6971,21 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 		.stream_name = "Secondary MI2S Playback",
 		.cpu_dai_name = "msm-dai-q6-mi2s.1",
 		.platform_name = "msm-pcm-routing",
+#ifdef CONFIG_NXP_TFA9894_SMARTPA
+    #ifdef CONFIG_NXP_TFA9894_SMARTPA_STEREO
+		.codecs = tfa98xx_dai_link_component,
+		.num_codecs = ARRAY_SIZE(tfa98xx_dai_link_component),
+    #else
+		.codec_name = "tfa98xx.8-0035",
+		.codec_dai_name = "tfa98xx-aif-8-35",
+    #endif
+#elif defined(CONFIG_SND_SMARTPA_AW881XX) && (defined(CONFIG_SND_SEC_I2S_AW881XX))
+		.codec_name = "aw881xx_smartpa.8-0034",
+		.codec_dai_name = "aw881xx-aif-8-34",
+#else
 		.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-rx",
+#endif
 		.no_pcm = 1,
 		.dpcm_playback = 1,
 		.id = MSM_BACKEND_DAI_SECONDARY_MI2S_RX,
