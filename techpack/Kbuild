@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: GPL-2.0-only
+TECHPACK?=y
+
+ifeq ($(wildcard $(srctree)/techpack/camera-zte),)
+techpack-dirs := $(shell find $(srctree)/$(src) -maxdepth 1 -mindepth 1 -type d -not -name ".*")
+else
+techpack-dirs := $(shell find $(srctree)/$(src) -maxdepth 1 -mindepth 1 -type d -not -name ".*" -not -name "camera")
+endif
+obj-${TECHPACK} += stub/ $(addsuffix /,$(subst $(srctree)/$(src)/,,$(techpack-dirs)))
+
+ifeq ($(wildcard $(srctree)/techpack/camera-zte),)
+techpack-header-dirs := $(shell find $(srctree)/techpack -maxdepth 1 -mindepth 1 -type d -not -name ".*")
+else
+techpack-header-dirs := $(shell find $(srctree)/techpack -maxdepth 1 -mindepth 1 -type d -not -name ".*" -not -name "camera")
+endif
+header-${TECHPACK} += $(addsuffix /include/uapi/,$(subst $(srctree)/techpack/,,$(techpack-header-dirs)))
